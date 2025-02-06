@@ -18,6 +18,7 @@ import {
   ElTag
 } from 'element-plus';
 import 'element-plus/dist/index.css';
+import request from '@/utils/request';
 
 // 定义数据类型
 interface GrowthRecord {
@@ -70,87 +71,77 @@ const newRecord = ref<Partial<GrowthRecord>>({
   stemDiameter: 0,
   leafCount: 0,
   leafArea: 0,
-  fruitStatus: '未结果',
+  fruitStatus: '未开花',
+  greenhouse: '',
   notes: ''
 });
 
-// 温室选项
-const greenhouseOptions = [
-  { value: 'A-1', label: 'A区1号温室' },
-  { value: 'A-2', label: 'A区2号温室' },
-  { value: 'B-1', label: 'B区1号温室' },
-  { value: 'B-2', label: 'B区2号温室' }
-];
+// 修改温室选项，从后端获取
+const greenhouseOptions = ref<{ value: number; label: string }[]>([]);
 
 // 添加加载状态
 const loading = ref(false);
+
+// 添加保存状态
+const saving = ref(false);
 
 // 修改加载表格数据函数
 const loadTableData = async () => {
   loading.value = true;
   try {
-    // 模拟API延迟
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    // 模拟API调用
-    let mockData: GrowthRecord[] = Array(50).fill(null).map((_, index) => ({
-      id: index + 1,
-      plantDate: '2024-03-01',
-      height: Number((45 + Math.random() * 10).toFixed(2)),
-      stemDiameter: Number((2.5 + Math.random()).toFixed(2)),
-      leafCount: Math.floor(8 + Math.random() * 4),
-      leafArea: Number((120 + Math.random() * 30).toFixed(2)),
-      floweringDate: '2024-03-15',
-      pollinationDate: '2024-03-16',
-      fruitStatus: ['未结果', '结果期', '成熟期'][Math.floor(Math.random() * 3)],
-      harvestDate: '2024-04-01',
-      collectionType: Math.random() > 0.5 ? 'manual' : 'auto',
-      collector: ['张三', '李四', '王五', '自动系统'][Math.floor(Math.random() * 4)],
-      collectTime: new Date().toISOString().split('T')[0],
-      greenhouse: greenhouseOptions[Math.floor(Math.random() * greenhouseOptions.length)].value,
-      notes: '生长状况良好'
-    }));
+    // 构建查询参数
+    const params: Record<string, any> = {
+      page: pagination.value.currentPage,
+      per_page: pagination.value.pageSize
+    };
 
-    // 应用搜索过滤
+    // 添加日期范围
     if (searchForm.value.dateRange?.length === 2) {
-      const [startDate, endDate] = searchForm.value.dateRange;
-      mockData = mockData.filter(item => 
-        item.plantDate >= startDate && item.plantDate <= endDate
-      );
+      params.start_date = searchForm.value.dateRange[0];
+      params.end_date = searchForm.value.dateRange[1];
     }
 
+    // 修改温室ID的处理
     if (searchForm.value.greenhouse) {
-      mockData = mockData.filter(item => 
-        item.greenhouse === searchForm.value.greenhouse
-      );
+      params.greenhouse_id = typeof searchForm.value.greenhouse === 'string'
+        ? Number(searchForm.value.greenhouse.match(/^\d+/)?.[0])
+        : searchForm.value.greenhouse;
     }
-
     if (searchForm.value.collectionType) {
-      mockData = mockData.filter(item => 
-        item.collectionType === searchForm.value.collectionType
-      );
+      params.collection_type = searchForm.value.collectionType;
     }
-
     if (searchForm.value.fruitStatus) {
-      mockData = mockData.filter(item => 
-        item.fruitStatus === searchForm.value.fruitStatus
-      );
+      params.fruit_status = searchForm.value.fruitStatus;
     }
-
     if (searchForm.value.collector) {
-      mockData = mockData.filter(item => 
-        item.collector.includes(searchForm.value.collector)
-      );
+      params.collector = searchForm.value.collector;
     }
 
-    // 应用分页
-    const start = (pagination.value.currentPage - 1) * pagination.value.pageSize;
-    const end = start + pagination.value.pageSize;
-    
-    pagination.value.total = mockData.length;
-    tableData.value = mockData.slice(start, end);
+    // 调用API
+    const response = await request.get('/api/growth-records', { params });
+
+    // 更新数据
+    tableData.value = response.data.records;
+    pagination.value.total = response.data.total;
+  } catch (error) {
+    console.error('Failed to load growth records:', error);
+    ElMessage.error('加载数据失败');
   } finally {
     loading.value = false;
+  }
+};
+
+// 修改温室选项，从后端获取
+const loadGreenhouseOptions = async () => {
+  try {
+    const response = await request.get('/api/greenhouses');
+    greenhouseOptions.value = response.data.map((greenhouse: any) => ({
+      value: greenhouse.id,
+      label: `${greenhouse.area}-${greenhouse.name}`,  // 修改显示格式为"区-温室号"
+    }));
+  } catch (error) {
+    console.error('Failed to load greenhouse options:', error);
+    ElMessage.error('加载温室列表失败');
   }
 };
 
@@ -194,53 +185,181 @@ const handleEdit = (row: GrowthRecord) => {
 // 处理删除
 const handleDelete = async (row: GrowthRecord) => {
   try {
-    await ElMessageBox.confirm('确定要删除这条记录吗？', '提示', {
-      type: 'warning'
-    });
-    // 实际项目中这里应该调用API
-    const index = tableData.value.findIndex(item => item.id === row.id);
-    if (index > -1) {
-      tableData.value.splice(index, 1);
-      ElMessage.success('删除成功');
+    await ElMessageBox.confirm(
+      '此操作将永久删除该记录, 是否继续?', 
+      '提示', 
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    );
+    
+    await request.delete(`/api/growth-records/${row.id}`);
+    ElMessage.success('删除成功');
+    // 重新加载数据
+    loadTableData();
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('Failed to delete growth record:', error);
+      ElMessage.error('删除失败');
     }
-  } catch {
-    // 用户取消删除
   }
 };
 
-// 保存编辑
-const saveEdit = () => {
+// 修改保存编辑函数
+const saveEdit = async () => {
   if (!editingRecord.value) return;
   
-  // 实际项目中这里应该调用API
-  const index = tableData.value.findIndex(item => item.id === editingRecord.value?.id);
-  if (index > -1) {
-    tableData.value[index] = { ...editingRecord.value };
+  saving.value = true;
+  try {
+    // 验证必填字段
+    if (!editingRecord.value.plantDate) {
+      throw new Error('请选择定植日期');
+    }
+    if (!editingRecord.value.greenhouse) {
+      throw new Error('请选择温室');
+    }
+    if (!editingRecord.value.collector) {
+      throw new Error('请输入采集人');
+    }
+
+    // 准备提交的数据
+    const submitData = {
+      ...editingRecord.value,
+      // 确保数值类型正确
+      height: Number(editingRecord.value.height),
+      stemDiameter: Number(editingRecord.value.stemDiameter),
+      leafCount: Number(editingRecord.value.leafCount),
+      leafArea: Number(editingRecord.value.leafArea),
+      // 确保日期格式正确
+      plantDate: editingRecord.value.plantDate.split('T')[0],
+      floweringDate: editingRecord.value.floweringDate?.split('T')[0] || null,
+      pollinationDate: editingRecord.value.pollinationDate?.split('T')[0] || null,
+      harvestDate: editingRecord.value.harvestDate?.split('T')[0] || null,
+      // 确保采集时间格式正确
+      collectTime: new Date().toISOString().slice(0, 19).replace('T', ' '),
+      // 只保留温室ID
+      greenhouse: typeof editingRecord.value.greenhouse === 'string' 
+        ? Number(editingRecord.value.greenhouse.match(/^\d+/)?.[0])
+        : editingRecord.value.greenhouse
+    };
+
+
+    // 调用API更新记录
+    await request.put(`/api/growth-records/${editingRecord.value.id}`, submitData);
     ElMessage.success('更新成功');
     editDialogVisible.value = false;
+    // 重新加载数据
+    loadTableData();
+  } catch (error) {
+    if (error instanceof Error) {
+      ElMessage.error(error.message);
+    } else {
+      console.error('Failed to update growth record:', error);
+      ElMessage.error('更新失败');
+    }
+  } finally {
+    saving.value = false;
   }
 };
 
-// 添加新记录
-const addRecord = () => {
-  // 实际项目中这里应该调用API
-  const record: GrowthRecord = {
-    id: tableData.value.length + 1,
-    ...newRecord.value as Omit<GrowthRecord, 'id'>
-  };
-  
-  tableData.value.unshift(record);
-  ElMessage.success('添加成功');
-  addDialogVisible.value = false;
-  newRecord.value = {
-    collectionType: 'manual',
-    collectTime: new Date().toISOString().split('T')[0]
-  };
+// 修改添加记录函数
+const addRecord = async () => {
+  try {
+    // 验证必填字段
+    if (!newRecord.value.plantDate) {
+      throw new Error('请选择定植日期');
+    }
+    if (!newRecord.value.greenhouse) {
+      throw new Error('请选择温室');
+    }
+    if (!newRecord.value.collector) {
+      throw new Error('请输入采集人');
+    }
+
+    // 准备提交的数据
+    const submitData = {
+      ...newRecord.value,
+      // 确保数值类型正确
+      height: Number(newRecord.value.height),
+      stemDiameter: Number(newRecord.value.stemDiameter),
+      leafCount: Number(newRecord.value.leafCount),
+      leafArea: Number(newRecord.value.leafArea),
+      // 确保日期格式正确
+      plantDate: formatDate(newRecord.value.plantDate),
+      floweringDate: newRecord.value.floweringDate ? formatDate(newRecord.value.floweringDate) : null,
+      pollinationDate: newRecord.value.pollinationDate ? formatDate(newRecord.value.pollinationDate) : null,
+      harvestDate: newRecord.value.harvestDate ? formatDate(newRecord.value.harvestDate) : null,
+      // 确保采集时间格式正确
+      collectTime: new Date().toISOString().slice(0, 19).replace('T', ' '),
+      // 只保留温室ID
+      greenhouse: typeof newRecord.value.greenhouse === 'string' 
+        ? Number(newRecord.value.greenhouse.match(/^\d+/)?.[0])
+        : newRecord.value.greenhouse
+    };
+
+    // 调用API添加记录
+    await request.post('/api/growth-records', submitData);
+    ElMessage.success('添加成功');
+    addDialogVisible.value = false;
+    // 重置表单
+    newRecord.value = {
+      collectionType: 'manual',
+      collectTime: new Date().toISOString().split('T')[0],
+      height: 0,
+      stemDiameter: 0,
+      leafCount: 0,
+      leafArea: 0,
+      fruitStatus: '未开花',
+      greenhouse: '',
+      notes: ''
+    };
+    // 重新加载数据
+    loadTableData();
+  } catch (error) {
+    if (error instanceof Error) {
+      ElMessage.error(error.message);
+    } else {
+      console.error('Failed to add growth record:', error);
+      ElMessage.error('添加失败');
+    }
+  }
 };
 
+// 添加日期格式化函数
+const formatDate = (date: Date | string | null): string | null => {
+  if (!date) return null;
+  if (date instanceof Date) {
+    return date.toISOString().split('T')[0];
+  }
+  if (typeof date === 'string') {
+    // 如果已经是 YYYY-MM-DD 格式就直接返回
+    if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return date;
+    }
+    // 否则尝试转换
+    return new Date(date).toISOString().split('T')[0];
+  }
+  return null;
+};
+
+// 修改表格中温室的显示
+const formatGreenhouse = (greenhouse: string) => {
+  // 从后端获取的温室列表
+  const found = greenhouseOptions.value.find(
+    option => option.label.includes(greenhouse)
+  );
+  return found ? found.label : greenhouse;
+};
+
+// 在组件挂载时加载数据
 onMounted(() => {
+  loadGreenhouseOptions();
   loadTableData();
 });
+
+
 </script>
 
 <template>
@@ -279,9 +398,10 @@ onMounted(() => {
         </el-form-item>
         <el-form-item label="果实状况">
           <el-select v-model="searchForm.fruitStatus" placeholder="选择状态" clearable>
-            <el-option label="未结果" value="未结果" />
-            <el-option label="结果期" value="结果期" />
-            <el-option label="成熟期" value="成熟期" />
+            <el-option label="未开花" value="未开花" />
+            <el-option label="开花期" value="开花期" />
+            <el-option label="坐果期" value="坐果期" />
+            <el-option label="果实膨大期" value="果实膨大期" />
           </el-select>
         </el-form-item>
         <el-form-item label="采集人">
@@ -339,11 +459,27 @@ onMounted(() => {
         </template>
       </el-table-column>
       <el-table-column prop="collector" label="采集人" width="100" />
-      <el-table-column prop="greenhouse" label="温室" width="120" />
-      <el-table-column label="操作" fixed="right" width="150">
+      <el-table-column prop="greenhouse" label="温室" width="120">
         <template #default="{ row }">
-          <el-button link type="primary" @click="handleEdit(row)">编辑</el-button>
-          <el-button link type="danger" @click="handleDelete(row)">删除</el-button>
+          {{ formatGreenhouse(row.greenhouse) }}
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" width="150" fixed="right">
+        <template #default="{ row }">
+          <el-button 
+            type="primary" 
+            size="small" 
+            @click="handleEdit(row)"
+          >
+            编辑
+          </el-button>
+          <el-button 
+            type="danger" 
+            size="small" 
+            @click="handleDelete(row)"
+          >
+            删除
+          </el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -450,9 +586,10 @@ onMounted(() => {
 
         <el-form-item label="果实状况" required>
           <el-select v-model="editingRecord.fruitStatus" placeholder="选择状态" style="width: 100%">
-            <el-option label="未结果" value="未结果" />
-            <el-option label="结果期" value="结果期" />
-            <el-option label="成熟期" value="成熟期" />
+            <el-option label="未开花" value="未开花" />
+            <el-option label="开花期" value="开花期" />
+            <el-option label="坐果期" value="坐果期" />
+            <el-option label="果实膨大期" value="果实膨大期" />
           </el-select>
         </el-form-item>
 
@@ -487,7 +624,13 @@ onMounted(() => {
       </el-form>
       <template #footer>
         <el-button @click="editDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="saveEdit">保存</el-button>
+        <el-button 
+          type="primary" 
+          :loading="saving" 
+          @click="saveEdit"
+        >
+          保存
+        </el-button>
       </template>
     </el-dialog>
 
@@ -578,9 +721,10 @@ onMounted(() => {
 
         <el-form-item label="果实状况" required>
           <el-select v-model="newRecord.fruitStatus" placeholder="选择状态" style="width: 100%">
-            <el-option label="未结果" value="未结果" />
-            <el-option label="结果期" value="结果期" />
-            <el-option label="成熟期" value="成熟期" />
+            <el-option label="未开花" value="未开花" />
+            <el-option label="开花期" value="开花期" />
+            <el-option label="坐果期" value="坐果期" />
+            <el-option label="果实膨大期" value="果实膨大期" />
           </el-select>
         </el-form-item>
 

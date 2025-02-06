@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import BackButton from '@/components/common/BackButton.vue';
+import request from '@/utils/request';
+import { ElMessage } from 'element-plus';
 import { Line } from 'vue-chartjs';
 import {
   Chart as ChartJS,
@@ -12,6 +14,7 @@ import {
   Tooltip,
   Legend
 } from 'chart.js';
+import annotationPlugin from 'chartjs-plugin-annotation';
 
 ChartJS.register(
   CategoryScale,
@@ -20,34 +23,24 @@ ChartJS.register(
   LineElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  annotationPlugin
 );
-
-// 使用静态日期
-const dateLabels = [
-  '3月1日', '3月2日', '3月3日', '3月4日', '3月5日', 
-  '3月6日', '3月7日', '3月8日', '3月9日', '3月10日',
-  '3月11日', '3月12日', '3月13日', '3月14日', '3月15日',
-  '3月16日', '3月17日', '3月18日', '3月19日', '3月20日',
-  '3月21日', '3月22日', '3月23日', '3月24日', '3月25日',
-  '3月26日', '3月27日', '3月28日', '3月29日', '3月30日'
-];
 
 // 生长趋势数据
 const growthTrendData = ref({
   height: {
-    labels: dateLabels,
+    labels: [],
     datasets: [
       {
         label: '实际株高(cm)',
-        data: [45, 46.2, 47.5, 48.8, 50.1, 51.3, 52.6, 53.9, 55.2, 56.4, 57.7, 59, 60.3, 61.5, 62.8],
+        data: [],
         borderColor: '#409EFF',
         tension: 0.4
       },
       {
         label: '预测株高(cm)',
-        data: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, 62.8,
-               64.1, 65.4, 66.7, 67.9, 69.2, 70.5, 71.8, 73, 74.3, 75.6, 76.9, 78.1, 79.4, 80.7, 82],
+        data: [],
         borderColor: '#67C23A',
         borderDash: [5, 5],
         tension: 0.4
@@ -55,18 +48,17 @@ const growthTrendData = ref({
     ]
   },
   stemDiameter: {
-    labels: dateLabels,
+    labels: [],
     datasets: [
       {
         label: '实际茎粗(cm)',
-        data: [1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6],
+        data: [],
         borderColor: '#E6A23C',
         tension: 0.4
       },
       {
         label: '预测茎粗(cm)',
-        data: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, 2.6,
-               2.7, 2.8, 2.9, 3.0, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 4.0, 4.1],
+        data: [],
         borderColor: '#F56C6C',
         borderDash: [5, 5],
         tension: 0.4
@@ -74,18 +66,17 @@ const growthTrendData = ref({
     ]
   },
   leafArea: {
-    labels: dateLabels,
+    labels: [],
     datasets: [
       {
         label: '实际叶面积(cm²)',
-        data: [120, 128, 135, 143, 150, 158, 165, 173, 180, 188, 195, 203, 210, 218, 225],
+        data: [],
         borderColor: '#67C23A',
         tension: 0.4
       },
       {
         label: '预测叶面积(cm²)',
-        data: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, 225,
-               233, 240, 248, 255, 263, 270, 278, 285, 293, 300, 308, 315, 323, 330, 338],
+        data: [],
         borderColor: '#409EFF',
         borderDash: [5, 5],
         tension: 0.4
@@ -93,18 +84,17 @@ const growthTrendData = ref({
     ]
   },
   leafCount: {
-    labels: dateLabels,
+    labels: [],
     datasets: [
       {
         label: '实际叶片数(片)',
-        data: [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22],
+        data: [],
         borderColor: '#F56C6C',
         tension: 0.4
       },
       {
         label: '预测叶片数(片)',
-        data: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, 22,
-               23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37],
+        data: [],
         borderColor: '#E6A23C',
         borderDash: [5, 5],
         tension: 0.4
@@ -112,18 +102,17 @@ const growthTrendData = ref({
     ]
   },
   flowerDensity: {
-    labels: dateLabels,
+    labels: [],
     datasets: [
       {
         label: '实际开花密度(朵/株)',
-        data: [0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6],
+        data: [],
         borderColor: '#909399',
         tension: 0.4
       },
       {
         label: '预测开花密度(朵/株)',
-        data: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, 6,
-               7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14],
+        data: [],
         borderColor: '#606266',
         borderDash: [5, 5],
         tension: 0.4
@@ -133,41 +122,58 @@ const growthTrendData = ref({
 });
 
 // 产量预测数据
-const yieldPredictionData = ref({
-  labels: dateLabels,
+const yieldData = ref({
+  labels: [],
   datasets: [
     {
-      label: '历史产量(kg)',
-      data: [100, 108, 115, 123, 130, 138, 145, 153, 160, 168, 175, 183, 190, 198, 205],
-      borderColor: '#E6A23C',
+      label: '实际产量(kg)',
+      data: [],
+      borderColor: '#409EFF',
       tension: 0.4
     },
     {
       label: '预测产量(kg)',
-      data: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, 205,
-             213, 220, 228, 235, 243, 250, 258, 265, 273, 280, 288, 295, 303, 310, 318],
-      borderColor: '#F56C6C',
+      data: [],
+      borderColor: '#67C23A',
       borderDash: [5, 5],
       tension: 0.4
     }
   ]
 });
 
+// 环境预测数据类型定义
+interface EnvironmentPrediction {
+  record_date: string;
+  daytime_temperature: number | null;
+  night_temperature: number | null;
+  predicted_night_temp: number | null;
+  daytime_humidity: number | null;
+  night_humidity: number | null;
+  predicted_night_humidity: number | null;
+  alert_level: string;
+  alert_message: string | null;
+}
+
 // 环境预测数据
-const environmentPredictionData = ref({
+const environmentData = ref({
   temperature: {
-    labels: dateLabels,
+    labels: [],
     datasets: [
       {
-        label: '实际温度(°C)',
-        data: [25, 25.5, 24.8, 25.2, 25.8, 24.9, 25.3, 25.7, 24.6, 25.1, 25.6, 24.7, 25.2, 25.9, 25.4],
+        label: '白天温度(°C)',
+        data: [],
+        borderColor: '#E6A23C',
+        tension: 0.4
+      },
+      {
+        label: '夜间温度(°C)',
+        data: [],
         borderColor: '#409EFF',
         tension: 0.4
       },
       {
-        label: '预测温度(°C)',
-        data: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, 25.4,
-               25.8, 25.2, 25.6, 25.9, 25.3, 25.7, 26.1, 25.4, 25.8, 26.2, 25.5, 25.9, 26.3, 25.6, 26],
+        label: '预测夜温(°C)',
+        data: [],
         borderColor: '#67C23A',
         borderDash: [5, 5],
         tension: 0.4
@@ -175,19 +181,24 @@ const environmentPredictionData = ref({
     ]
   },
   humidity: {
-    labels: dateLabels,
+    labels: [],
     datasets: [
       {
-        label: '实际湿度(%)',
-        data: [65, 63, 66, 64, 62, 65, 63, 61, 64, 62, 60, 63, 61, 59, 62],
+        label: '白天湿度(%)',
+        data: [],
         borderColor: '#E6A23C',
         tension: 0.4
       },
       {
-        label: '预测湿度(%)',
-        data: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, 62,
-               60, 63, 61, 59, 62, 60, 58, 61, 59, 57, 60, 58, 56, 59, 57],
-        borderColor: '#F56C6C',
+        label: '夜间湿度(%)',
+        data: [],
+        borderColor: '#409EFF',
+        tension: 0.4
+      },
+      {
+        label: '预测夜湿(%)',
+        data: [],
+        borderColor: '#67C23A',
         borderDash: [5, 5],
         tension: 0.4
       }
@@ -195,21 +206,28 @@ const environmentPredictionData = ref({
   }
 });
 
+// 环境预警信息
+const environmentWarnings = ref<{
+  time: string;
+  type: string;
+  level: string;
+  message: string;
+}[]>([]);
+
 // 添加土壤养分数据
 const soilNutrientData = ref({
   nitrogen: {
-    labels: dateLabels,
+    labels: [],
     datasets: [
       {
         label: '氮含量(mg/kg)',
-        data: [180, 178, 175, 172, 170, 168, 165, 163, 160, 158, 155, 153, 150, 148, 145],
+        data: [],
         borderColor: '#409EFF',
         tension: 0.4
       },
       {
         label: '预测氮含量(mg/kg)',
-        data: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, 145,
-               143, 140, 138, 135, 133, 130, 128, 125, 123, 120, 118, 115, 113, 110, 108],
+        data: [],
         borderColor: '#67C23A',
         borderDash: [5, 5],
         tension: 0.4
@@ -217,18 +235,17 @@ const soilNutrientData = ref({
     ]
   },
   phosphorus: {
-    labels: dateLabels,
+    labels: [],
     datasets: [
       {
         label: '磷含量(mg/kg)',
-        data: [45, 44, 43, 42, 41, 40, 39, 38, 37, 36, 35, 34, 33, 32, 31],
+        data: [],
         borderColor: '#E6A23C',
         tension: 0.4
       },
       {
         label: '预测磷含量(mg/kg)',
-        data: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, 31,
-               30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16],
+        data: [],
         borderColor: '#F56C6C',
         borderDash: [5, 5],
         tension: 0.4
@@ -236,18 +253,17 @@ const soilNutrientData = ref({
     ]
   },
   potassium: {
-    labels: dateLabels,
+    labels: [],
     datasets: [
       {
         label: '钾含量(mg/kg)',
-        data: [220, 218, 215, 213, 210, 208, 205, 203, 200, 198, 195, 193, 190, 188, 185],
+        data: [],
         borderColor: '#909399',
         tension: 0.4
       },
       {
         label: '预测钾含量(mg/kg)',
-        data: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, 185,
-               183, 180, 178, 175, 173, 170, 168, 165, 163, 160, 158, 155, 153, 150, 148],
+        data: [],
         borderColor: '#606266',
         borderDash: [5, 5],
         tension: 0.4
@@ -255,18 +271,17 @@ const soilNutrientData = ref({
     ]
   },
   ph: {
-    labels: dateLabels,
+    labels: [],
     datasets: [
       {
         label: 'pH值',
-        data: [6.5, 6.48, 6.45, 6.43, 6.4, 6.38, 6.35, 6.33, 6.3, 6.28, 6.25, 6.23, 6.2, 6.18, 6.15],
+        data: [],
         borderColor: '#67C23A',
         tension: 0.4
       },
       {
         label: '预测pH值',
-        data: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, 6.15,
-               6.13, 6.1, 6.08, 6.05, 6.03, 6.0, 5.98, 5.95, 5.93, 5.9, 5.88, 5.85, 5.83, 5.8, 5.78],
+        data: [],
         borderColor: '#409EFF',
         borderDash: [5, 5],
         tension: 0.4
@@ -281,12 +296,30 @@ const chartOptions = {
   maintainAspectRatio: false,
   plugins: {
     legend: {
-      position: 'top' as const
+      position: 'top' as const,
+      display: true
     }
   },
   scales: {
     y: {
-      beginAtZero: true
+      beginAtZero: true,
+      grid: {
+        display: true
+      }
+    },
+    x: {
+      grid: {
+        display: false
+      }
+    }
+  },
+  elements: {
+    point: {
+      radius: 3,
+      hoverRadius: 5
+    },
+    line: {
+      tension: 0.4
     }
   }
 };
@@ -317,100 +350,150 @@ const warnings = ref([
 const analysisResults = ref({
   growth: {
     height: {
-      prediction: '预计15天后平均株高将达到82cm，生长速度符合标准范围。',
-      trend: '生长曲线呈稳定上升趋势，日均生长速度1.2cm，波动范围±0.3cm。'
+      prediction: '暂无预测数据',
+      trend: '暂无趋势分析'
     },
     stemDiameter: {
-      prediction: '预计茎粗将达到4.1cm，增长速度稳定。',
-      trend: '茎粗增长趋势良好，植株支撑能力逐渐增强。'
+      prediction: '暂无预测数据',
+      trend: '暂无趋势分析'
     },
     leafArea: {
-      prediction: '叶面积预计达到338cm²，光合作用效率提升。',
-      trend: '叶面积扩张速度适中，有利于果实生长。'
+      prediction: '暂无预测数据',
+      trend: '暂无趋势分析'
     },
     leafCount: {
-      prediction: '预计叶片数将增至37片，覆盖度理想。',
-      trend: '叶片发育正常，营养生长良好。'
+      prediction: '暂无预测数据',
+      trend: '暂无趋势分析'
     },
     flowerDensity: {
-      prediction: '开花密度预计达到14朵/株，坐果率预期良好。',
-      trend: '开花进程符合生长期望，花芽分化正常。'
+      prediction: '暂无预测数据',
+      trend: '暂无趋势分析'
     },
-    suggestion: '建议：1. 继续保持现有水肥管理方案 2. 适当增加钾肥比例 3. 注意控制温室温度在适宜范围'
+    suggestion: '暂无建议'
   },
   yield: {
-    prediction: '本季度预计总产量将达到3850kg，较上季度增长12.3%。',
-    trend: '单株产量稳定增长，预计平均单株产量2.8kg。',
-    suggestion: '建议：1. 适当增加钾肥施用量 2. 加强病虫害防治 3. 优化采收时间安排'
+    prediction: '暂无预测数据',
+    trend: '暂无趋势分析',
+    suggestion: '暂无建议'
   },
   environment: {
-    temperature: '温度变化趋势基本稳定，但午后温度偏高。',
-    humidity: '湿度波动较大，夜间湿度偏低。',
-    suggestion: '建议：1. 调整通风时段 2. 增加夜间加湿频次 3. 完善遮阳系统控制策略'
+    temperature: '暂无温度趋势分析',
+    humidity: '暂无湿度趋势分析',
+    suggestion: '暂无建议'
   },
   soil: {
     nitrogen: {
-      prediction: '氮含量预计将降至108mg/kg，需要及时补充。',
-      trend: '氮素消耗速度较快，已接近警戒值。'
+      prediction: '暂无预测数据',
+      trend: '暂无趋势分析'
     },
     phosphorus: {
-      prediction: '磷含量预计降至16mg/kg，低于适宜范围。',
-      trend: '磷素利用率较高，需要适时补充。'
+      prediction: '暂无预测数据',
+      trend: '暂无趋势分析'
     },
     potassium: {
-      prediction: '钾含量预计降至148mg/kg，仍在适宜范围内。',
-      trend: '钾素消耗平稳，维持在合理水平。'
+      prediction: '暂无预测数据',
+      trend: '暂无趋势分析'
     },
     ph: {
-      prediction: 'pH值预计降至5.78，偏酸性。',
-      trend: 'pH值呈缓慢下降趋势，需要调节。'
+      prediction: '暂无预测数据',
+      trend: '暂无趋势分析'
     },
-    suggestion: '建议：1. 增施含氮肥料 2. 补充磷肥 3. 使用石灰调节pH值 4. 定期进行土壤检测'
+    suggestion: '暂无建议'
   }
 });
 
 // 添加当前选中的温室
-const currentGreenhouse = ref('A-1');
+const currentGreenhouse = ref('');
 
 // 温室选项
-const greenhouseOptions = [
-  { value: 'A-1', label: 'A-1温室', status: '正常' },
-  { value: 'A-2', label: 'A-2温室', status: '正常' },
-  { value: 'B-1', label: 'B-1温室', status: '警告' },
-  { value: 'B-2', label: 'B-2温室', status: '正常' }
-];
+const greenhouseOptions = ref([]);
 
-// 温室统计数据
-const greenhouseStats = computed(() => {
-  const stats = {
-    'A-1': {
-      totalArea: '1000㎡',
-      totalPlants: '2000株',
-      avgGrowth: '1.3cm/天',
-      healthStatus: '96%'
-    },
-    'A-2': {
-      totalArea: '1000㎡',
-      totalPlants: '2000株',
-      avgGrowth: '1.2cm/天',
-      healthStatus: '97%'
-    },
-    'B-1': {
-      totalArea: '1200㎡',
-      totalPlants: '2400株',
-      avgGrowth: '1.1cm/天',
-      healthStatus: '92%'
-    },
-    'B-2': {
-      totalArea: '1200㎡',
-      totalPlants: '2400株',
-      avgGrowth: '1.2cm/天',
-      healthStatus: '95%'
+// 加载温室选项数据
+const loadGreenhouseOptions = async () => {
+  try {
+    const response = await request.get('/api/greenhouse/stats');
+    greenhouseOptions.value = response.data.map((gh: any) => ({
+      value: gh.id.toString(),
+      label: gh.name,
+      status: gh.greenhouse.status,
+      totalArea: `${gh.greenhouse.size}㎡`,
+      totalPlants: gh.currentBatch ? `${gh.currentBatch.plantCount}株` : '0株',
+      avgGrowth: gh.currentBatch ? gh.currentBatch.avgGrowthRate : '0cm/天',
+      healthStatus: gh.currentBatch ? gh.currentBatch.healthRate : '0%'
+    }));
+    
+    // 默认选中第一个温室并加载其数据
+    if (greenhouseOptions.value.length > 0) {
+      currentGreenhouse.value = greenhouseOptions.value[0].value;
+      await Promise.all([
+        loadGrowthTrends(greenhouseOptions.value[0].value),
+        loadYieldTrends(greenhouseOptions.value[0].value)
+      ]);
     }
-  };
+  } catch (error) {
+    console.error('Failed to load greenhouse options:', error);
+    ElMessage.error('加载温室列表失败');
+  }
+};
 
-  return stats[currentGreenhouse.value];
+// 添加温室统计数据
+const greenhouseStats = ref([]);
+
+// 加载温室统计数据
+const loadGreenhouseStats = async () => {
+  try {
+    const response = await request.get('/api/greenhouse/stats');
+    greenhouseStats.value = response.data;
+  } catch (error) {
+    console.error('Failed to load greenhouse stats:', error);
+    ElMessage.error('加载温室信息失败');
+  }
+};
+
+// 获取当前选中温室的统计信息
+const currentStats = computed(() => {
+  return greenhouseStats.value.find(gh => gh.id.toString() === currentGreenhouse.value);
 });
+
+// 获取状态标签类型
+const getStatusType = (status: string) => {
+  switch (status) {
+    case '正常':
+      return 'success';
+    case '异常':
+      return 'danger';
+    case '维护中':
+      return 'warning';
+    case '空闲':
+      return 'info';
+    default:
+      return 'info';
+  }
+};
+
+// 获取质量等级标签类型
+const getQualityType = (rating: string) => {
+  switch (rating) {
+    case 'A':
+      return 'success';
+    case 'B':
+      return 'warning';
+    case 'C':
+      return 'danger';
+    default:
+      return 'info';
+  }
+};
+
+// 切换温室
+const handleGreenhouseChange = async (value: string) => {
+  currentGreenhouse.value = value;
+  await Promise.all([
+    loadGrowthTrends(value),
+    loadYieldTrends(value),
+    loadEnvironmentData(value)  // 添加环境数据加载
+  ]);
+};
 
 // 生成温室特定的数据
 const getGreenhouseData = (baseData: any, multiplier: number) => {
@@ -456,7 +539,7 @@ const filteredYieldData = computed(() => {
   };
 
   const multiplier = multipliers[currentGreenhouse.value as keyof typeof multipliers];
-  return getGreenhouseData(yieldPredictionData.value, multiplier);
+  return getGreenhouseData(yieldData.value, multiplier);
 });
 
 // 过滤环境数据
@@ -472,16 +555,16 @@ const filteredEnvironmentData = computed(() => {
 
   return {
     temperature: {
-      ...environmentPredictionData.value.temperature,
-      datasets: environmentPredictionData.value.temperature.datasets.map(dataset => ({
+      ...environmentData.value.temperature,
+      datasets: environmentData.value.temperature.datasets.map(dataset => ({
         ...dataset,
         data: dataset.data.map(value => 
           value === null ? null : Number((value + variation.temp).toFixed(1)))
       }))
     },
     humidity: {
-      ...environmentPredictionData.value.humidity,
-      datasets: environmentPredictionData.value.humidity.datasets.map(dataset => ({
+      ...environmentData.value.humidity,
+      datasets: environmentData.value.humidity.datasets.map(dataset => ({
         ...dataset,
         data: dataset.data.map(value => 
           value === null ? null : Number((value + variation.humid).toFixed(1)))
@@ -521,14 +604,548 @@ const getGreenhouseDataWithVariation = (baseData: any, variation: number) => {
   };
 };
 
-// 切换温室
-const handleGreenhouseChange = (value: string) => {
-  currentGreenhouse.value = value;
+// 计算总体统计数据
+const overallStats = computed(() => {
+  if (!greenhouseStats.value || greenhouseStats.value.length === 0) return null;
+  
+  // 计算总面积
+  const totalArea = greenhouseStats.value
+    .reduce((sum, gh) => sum + (gh.greenhouse?.size || 0), 0)
+    .toFixed(1) + '㎡';
+
+  // 计算种植总数
+  const totalPlants = greenhouseStats.value
+    .reduce((sum, gh) => sum + (gh.currentBatch?.plantCount || 0), 0) + '株';
+
+  // 计算平均生长速度
+  const activeBatches = greenhouseStats.value.filter(gh => gh.currentBatch?.avgGrowthRate);
+  const avgGrowth = activeBatches.length > 0
+    ? (activeBatches.reduce((sum, gh) => sum + parseFloat(gh.currentBatch.avgGrowthRate), 0) / activeBatches.length).toFixed(1) + 'cm/天'
+    : '0cm/天';
+
+  // 计算平均健康率
+  const healthyBatches = greenhouseStats.value.filter(gh => gh.currentBatch?.healthRate);
+  const avgHealth = healthyBatches.length > 0
+    ? (healthyBatches.reduce((sum, gh) => sum + parseFloat(gh.currentBatch.healthRate), 0) / healthyBatches.length).toFixed(1) + '%'
+    : '0%';
+
+  return {
+    totalArea,
+    totalPlants,
+    avgGrowth,
+    avgHealth
+  };
+});
+
+// 安全的数据映射函数，添加缺失值补全功能
+const safeMapData = (data: any[] | undefined) => {
+  if (!Array.isArray(data) || data.length === 0) {
+    return new Array(30).fill(null);
+  }
+
+  // 补全缺失值函数
+  const fillMissingValues = (arr: (number | null)[]) => {
+    const result = [...arr];
+    
+    // 处理开头的null值
+    let firstValidIndex = result.findIndex(val => val !== null);
+    if (firstValidIndex > 0) {
+      const firstValidValue = result[firstValidIndex];
+      for (let i = 0; i < firstValidIndex; i++) {
+        result[i] = firstValidValue;
+      }
+    }
+
+    // 处理中间和结尾的null值
+    for (let i = 1; i < result.length; i++) {
+      if (result[i] === null) {
+        // 寻找前一个有效值
+        let prevValue = null;
+        for (let j = i - 1; j >= 0; j--) {
+          if (result[j] !== null) {
+            prevValue = result[j];
+            break;
+          }
+        }
+        
+        // 寻找后一个有效值
+        let nextValue = null;
+        for (let j = i + 1; j < result.length; j++) {
+          if (result[j] !== null) {
+            nextValue = result[j];
+            break;
+          }
+        }
+
+        // 补全缺失值
+        if (prevValue !== null && nextValue !== null) {
+          // 如果前后都有值，取平均值
+          result[i] = Number(((prevValue + nextValue) / 2).toFixed(1));
+        } else if (prevValue !== null) {
+          // 如果只有前值，使用前值
+          result[i] = prevValue;
+        } else if (nextValue !== null) {
+          // 如果只有后值，使用后值
+          result[i] = nextValue;
+        }
+      }
+    }
+
+    return result;
+  };
+
+  // 处理数据并补全缺失值
+  const processedData = data.map(val => 
+    val === null ? null : Number(Number(val).toFixed(1))
+  );
+  
+  return fillMissingValues(processedData);
 };
 
-onMounted(() => {
-  // 不需要生成数据了，因为使用静态数据
+// 生长趋势数据加载方法
+const loadGrowthTrends = async (greenhouseId: string) => {
+  try {
+    const response = await request.get(`/api/greenhouse/growth-trends/${greenhouseId}`);
+
+    const { dateLabels, actualData, predictedData, analysis } = response.data;
+
+    // 确保数据存在且格式正确
+    if (!actualData || !predictedData) {
+      throw new Error('数据格式错误');
+    }
+
+    // 确保数据格式正确
+    const formattedData = {
+      height: {
+        labels: dateLabels || [],
+        datasets: [
+          {
+            label: '实际株高(cm)',
+            data: safeMapData(actualData.height),
+            borderColor: '#409EFF',
+            tension: 0.4,
+            fill: false
+          },
+          {
+            label: '预测株高(cm)',
+            data: safeMapData(predictedData.height),
+            borderColor: '#67C23A',
+            borderDash: [5, 5],
+            tension: 0.4,
+            fill: false
+          }
+        ]
+      },
+      stemDiameter: {
+        labels: dateLabels || [],
+        datasets: [
+          {
+            label: '实际茎粗(mm)',
+            data: safeMapData(actualData.stemDiameter),
+            borderColor: '#E6A23C',
+            tension: 0.4
+          },
+          {
+            label: '预测茎粗(mm)',
+            data: safeMapData(predictedData.stemDiameter),
+            borderColor: '#F56C6C',
+            borderDash: [5, 5],
+            tension: 0.4
+          }
+        ]
+      },
+      leafArea: {
+        labels: dateLabels || [],
+        datasets: [
+          {
+            label: '实际叶面积(cm²)',
+            data: safeMapData(actualData.leafArea),
+            borderColor: '#67C23A',
+            tension: 0.4
+          },
+          {
+            label: '预测叶面积(cm²)',
+            data: safeMapData(predictedData.leafArea),
+            borderColor: '#409EFF',
+            borderDash: [5, 5],
+            tension: 0.4
+          }
+        ]
+      },
+      leafCount: {
+        labels: dateLabels || [],
+        datasets: [
+          {
+            label: '实际叶片数(片)',
+            data: safeMapData(actualData.leafCount),
+            borderColor: '#F56C6C',
+            tension: 0.4
+          },
+          {
+            label: '预测叶片数(片)',
+            data: safeMapData(predictedData.leafCount),
+            borderColor: '#E6A23C',
+            borderDash: [5, 5],
+            tension: 0.4
+          }
+        ]
+      }
+    };
+
+    // 更新图表数据
+    growthTrendData.value = formattedData;
+
+    // 更新分析结果
+    analysisResults.value = {
+      growth: {
+        height: {
+          prediction: analysis?.growth?.height?.prediction || '暂无预测数据',
+          trend: analysis?.growth?.height?.trend || '暂无趋势分析'
+        },
+        stemDiameter: {
+          prediction: analysis?.growth?.stemDiameter?.prediction || '暂无预测数据',
+          trend: analysis?.growth?.stemDiameter?.trend || '暂无趋势分析'
+        },
+        leafArea: {
+          prediction: analysis?.growth?.leafArea?.prediction || '暂无预测数据',
+          trend: analysis?.growth?.leafArea?.trend || '暂无趋势分析'
+        },
+        leafCount: {
+          prediction: analysis?.growth?.leafCount?.prediction || '暂无预测数据',
+          trend: analysis?.growth?.leafCount?.trend || '暂无趋势分析'
+        },
+        suggestion: analysis?.growth?.suggestion || '暂无建议'
+      }
+    };
+
+  } catch (error) {
+    console.error('加载生长趋势数据失败:', error);
+    ElMessage.error('加载生长趋势数据失败');
+    
+    // 出错时显示空数据提示
+    growthTrendData.value = {
+      height: { labels: [], datasets: [] },
+      stemDiameter: { labels: [], datasets: [] },
+      leafArea: { labels: [], datasets: [] },
+      leafCount: { labels: [], datasets: [] }
+    };
+    
+    analysisResults.value = {
+      growth: {
+        height: { prediction: '暂无数据', trend: '暂无数据' },
+        stemDiameter: { prediction: '暂无数据', trend: '暂无数据' },
+        leafArea: { prediction: '暂无数据', trend: '暂无数据' },
+        leafCount: { prediction: '暂无数据', trend: '暂无数据' },
+        suggestion: '暂无数据'
+      }
+    };
+  }
+};
+
+// 产量分析结果
+const yieldAnalysis = ref({
+  currentStatus: '未知',
+  totalYield: 0,
+  predictedTotal: 0,
+  completionRate: 0,
+  averageQuality: '未知',
+  suggestion: '暂无建议'
 });
+
+// 加载产量预测数据
+const loadYieldTrends = async (greenhouseId: string) => {
+  try {
+    const response = await request.get(`/api/yield/trends/${greenhouseId}`);
+    const data = response.data;
+
+    // 确保数据存在
+    if (!data || !data.dateLabels) {
+      throw new Error('Invalid data format');
+    }
+
+    // 更新图表数据
+    yieldData.value = {
+      labels: data.dateLabels,
+      datasets: [
+        {
+          label: '实际产量(kg)',
+          data: data.actualData.map((val: any) => val === null ? null : Number(val)),
+          borderColor: '#409EFF',
+          tension: 0.4
+        },
+        {
+          label: '预测产量(kg)',
+          data: data.predictedData.map((val: any) => val === null ? null : Number(val)),
+          borderColor: '#67C23A',
+          borderDash: [5, 5],
+          tension: 0.4
+        }
+      ]
+    };
+
+    // 更新分析结果
+    yieldAnalysis.value = {
+      currentStatus: data.analysis.currentStatus || '未知',
+      totalYield: Number(data.analysis.totalYield) || 0,
+      predictedTotal: Number(data.analysis.predictedTotal) || 0,
+      completionRate: Number(data.analysis.completionRate) || 0,
+      averageQuality: data.analysis.averageQuality || '未知',
+      suggestion: data.analysis.suggestion || '暂无建议'
+    };
+
+  } catch (error) {
+    console.error('Failed to load yield trends:', error);
+    ElMessage.error('加载产量预测数据失败');
+    
+    // 出错时重置数据
+    yieldData.value = {
+      labels: [],
+      datasets: [
+        {
+          label: '实际产量(kg)',
+          data: [],
+          borderColor: '#409EFF',
+          tension: 0.4
+        },
+        {
+          label: '预测产量(kg)',
+          data: [],
+          borderColor: '#67C23A',
+          borderDash: [5, 5],
+          tension: 0.4
+        }
+      ]
+    };
+  }
+};
+
+// 加载环境预测数据
+const loadEnvironmentData = async (greenhouseId: string) => {
+  try {
+    const response = await request.get(`/api/environment/predictions/${greenhouseId}`);
+    const data: EnvironmentPrediction[] = response.data;
+
+    // 处理图表数据
+    const labels = data.map(item => item.record_date);
+    
+    // 更新温度图表数据
+    environmentData.value.temperature = {
+      labels,
+      datasets: [
+        {
+          label: '白天温度(°C)',
+          data: data.map(item => item.daytime_temperature),
+          borderColor: '#E6A23C',
+          tension: 0.4
+        },
+        {
+          label: '夜间温度(°C)',
+          data: data.map(item => item.night_temperature),
+          borderColor: '#409EFF',
+          tension: 0.4
+        },
+        {
+          label: '预测夜温(°C)',
+          data: data.map(item => item.predicted_night_temp),
+          borderColor: '#67C23A',
+          borderDash: [5, 5],
+          tension: 0.4
+        }
+      ]
+    };
+
+    // 更新湿度图表数据
+    environmentData.value.humidity = {
+      labels,
+      datasets: [
+        {
+          label: '白天湿度(%)',
+          data: data.map(item => item.daytime_humidity),
+          borderColor: '#E6A23C',
+          tension: 0.4
+        },
+        {
+          label: '夜间湿度(%)',
+          data: data.map(item => item.night_humidity),
+          borderColor: '#409EFF',
+          tension: 0.4
+        },
+        {
+          label: '预测夜湿(%)',
+          data: data.map(item => item.predicted_night_humidity),
+          borderColor: '#67C23A',
+          borderDash: [5, 5],
+          tension: 0.4
+        }
+      ]
+    };
+
+    // 更新预警信息
+    environmentWarnings.value = data
+      .filter(item => item.alert_level !== '正常' && item.alert_message)
+      .map(item => ({
+        time: item.record_date,
+        type: '环境预警',
+        level: getAlertLevel(item.alert_level),
+        message: item.alert_message || ''
+      }))
+      .slice(-5); // 只显示最近5条预警
+
+  } catch (error) {
+    console.error('Failed to load environment predictions:', error);
+    ElMessage.error('加载环境预测数据失败');
+  }
+};
+
+// 告警等级转换
+const getAlertLevel = (level: string): string => {
+  switch (level) {
+    case '严重':
+      return 'error';
+    case '中度':
+      return 'warning';
+    case '轻微':
+      return 'info';
+    default:
+      return 'info';
+  }
+};
+
+// 修改初始化函数
+const initData = async () => {
+  await loadGreenhouseOptions();
+  await loadGreenhouseStats();
+  if (currentGreenhouse.value) {
+    await Promise.all([
+      loadGrowthTrends(currentGreenhouse.value),
+      loadYieldTrends(currentGreenhouse.value),
+      loadEnvironmentData(currentGreenhouse.value)  // 添加环境数据加载
+    ]);
+  }
+};
+
+// 确保onMounted在所有方法定义之后
+onMounted(() => {
+  initData();
+});
+
+// 温度图表配置
+const temperatureChartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: {
+      position: 'top' as const
+    },
+    annotation: {
+      annotations: {
+        dayTempMinLine: {
+          type: 'line',
+          yMin: 25,
+          yMax: 25,
+          borderColor: '#E6A23C',
+          borderWidth: 1,
+          borderDash: [5, 5],
+          label: {
+            content: '白天最低温度(25°C)',
+            enabled: true,
+            position: 'left'
+          }
+        },
+        dayTempMaxLine: {
+          type: 'line',
+          yMin: 32,
+          yMax: 32,
+          borderColor: '#F56C6C',
+          borderWidth: 1,
+          borderDash: [5, 5],
+          label: {
+            content: '白天最高温度(32°C)',
+            enabled: true,
+            position: 'left'
+          }
+        },
+        nightTempMinLine: {
+          type: 'line',
+          yMin: 15,
+          yMax: 15,
+          borderColor: '#409EFF',
+          borderWidth: 1,
+          borderDash: [5, 5],
+          label: {
+            content: '夜间最低温度(15°C)',
+            enabled: true,
+            position: 'left'
+          }
+        },
+        nightTempMaxLine: {
+          type: 'line',
+          yMin: 18,
+          yMax: 18,
+          borderColor: '#67C23A',
+          borderWidth: 1,
+          borderDash: [5, 5],
+          label: {
+            content: '夜间最高温度(18°C)',
+            enabled: true,
+            position: 'left'
+          }
+        }
+      }
+    }
+  },
+  scales: {
+    y: {
+      beginAtZero: false
+    }
+  }
+};
+
+// 湿度图表配置
+const humidityChartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: {
+      position: 'top' as const
+    },
+    annotation: {
+      annotations: {
+        humidityMinLine: {
+          type: 'line',
+          yMin: 60,
+          yMax: 60,
+          borderColor: '#E6A23C',
+          borderWidth: 1,
+          borderDash: [5, 5],
+          label: {
+            content: '最低湿度(60%)',
+            enabled: true,
+            position: 'left'
+          }
+        },
+        humidityMaxLine: {
+          type: 'line',
+          yMin: 90,
+          yMax: 90,
+          borderColor: '#F56C6C',
+          borderWidth: 1,
+          borderDash: [5, 5],
+          label: {
+            content: '最高湿度(90%)',
+            enabled: true,
+            position: 'left'
+          }
+        }
+      }
+    }
+  },
+  scales: {
+    y: {
+      beginAtZero: false
+    }
+  }
+};
 </script>
 
 <template>
@@ -536,14 +1153,53 @@ onMounted(() => {
     <BackButton />
     <h2>趋势分析</h2>
 
+        <!-- 温室概况 -->
+      <div class="greenhouse-overview" v-if="overallStats">
+      <div class="stat-card">
+        <div class="stat-icon">🏗️</div>
+        <div class="stat-content">
+          <div class="stat-label">总面积</div>
+          <div class="stat-value">{{ overallStats.totalArea }}</div>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-icon">🌱</div>
+        <div class="stat-content">
+          <div class="stat-label">种植总数</div>
+          <div class="stat-value">{{ overallStats.totalPlants }}</div>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-icon">📈</div>
+        <div class="stat-content">
+          <div class="stat-label">平均生长速度</div>
+          <div class="stat-value">{{ overallStats.avgGrowth }}</div>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-icon">💪</div>
+        <div class="stat-content">
+          <div class="stat-label">平均健康率</div>
+          <div class="stat-value">{{ overallStats.avgHealth }}</div>
+        </div>
+      </div>
+    </div>
+
     <!-- 温室选择器 -->
     <div class="greenhouse-selector">
       <el-radio-group v-model="currentGreenhouse" @change="handleGreenhouseChange">
-        <el-radio-button v-for="gh in greenhouseOptions" :key="gh.value" :label="gh.value">
+        <el-radio-button 
+          v-for="gh in greenhouseOptions" 
+          :key="gh.value" 
+          :label="gh.value"
+        >
           {{ gh.label }}
-          <el-tag
-            :type="gh.status === '正常' ? 'success' : 'warning'"
-            size="small"
+          <el-tag 
+            :type="getStatusType(gh.status)"
+            size="small" 
             class="status-tag"
           >
             {{ gh.status }}
@@ -552,37 +1208,81 @@ onMounted(() => {
       </el-radio-group>
     </div>
 
-    <!-- 温室概况 -->
-    <div class="greenhouse-overview">
-      <div class="stat-card">
-        <div class="stat-icon">🏗️</div>
-        <div class="stat-content">
-          <div class="stat-label">总面积</div>
-          <div class="stat-value">{{ greenhouseStats.totalArea }}</div>
+    <!-- 温室选择器和概况 -->
+    <template v-if="currentStats && currentStats.currentBatch">
+      <div class="info-section">
+        <h3>种植概况</h3>
+        <div class="info-cards">
+          <div class="info-card">
+            <div class="info-icon">🌱</div>
+            <div class="info-content">
+              <div class="info-label">作物品种</div>
+              <div class="info-value">{{ currentStats.currentBatch.cropName }}</div>
+              <div class="info-sub">{{ currentStats.currentBatch.variety }}</div>
+            </div>
+          </div>
+
+          <div class="info-card">
+            <div class="info-icon">📈</div>
+            <div class="info-content">
+              <div class="info-label">生长阶段</div>
+              <div class="info-value">{{ currentStats.currentBatch.growthStage }}</div>
+              <div class="info-sub">{{ currentStats.currentBatch.daysInStage }}天</div>
+            </div>
+          </div>
+
+          <div class="info-card">
+            <div class="info-icon">🌡️</div>
+            <div class="info-content">
+              <div class="info-label">生长速度</div>
+              <div class="info-value">{{ currentStats.currentBatch.avgGrowthRate }}</div>
+            </div>
+          </div>
+
+          <div class="info-card">
+            <div class="info-icon">💪</div>
+            <div class="info-content">
+              <div class="info-label">健康状况</div>
+              <div class="info-value">{{ currentStats.currentBatch.healthRate }}</div>
+            </div>
+          </div>
         </div>
+
+        <!-- 管理信息 -->
+        <el-collapse class="management-info">
+          <el-collapse-item title="管理信息" name="1">
+            <el-descriptions :column="2" border>
+              <el-descriptions-item label="负责人">
+                {{ currentStats.management.manager }}
+              </el-descriptions-item>
+              <el-descriptions-item label="质量等级">
+                <el-tag :type="getQualityType(currentStats.currentBatch.qualityRating)">
+                  {{ currentStats.currentBatch.qualityRating }}级
+                </el-tag>
+              </el-descriptions-item>
+              <el-descriptions-item label="施肥方案">
+                {{ currentStats.management.fertilizerPlan }}
+              </el-descriptions-item>
+              <el-descriptions-item label="浇水计划">
+                {{ currentStats.management.waterSchedule }}
+              </el-descriptions-item>
+            </el-descriptions>
+          </el-collapse-item>
+          
+          <el-collapse-item title="预警信息" name="2">
+            <div class="warning-info" v-if="currentStats.warnings.pestControl">
+              <div class="warning-title">病虫害防治记录：</div>
+              <div class="warning-content">{{ currentStats.warnings.pestControl }}</div>
+            </div>
+            <div class="warning-info" v-if="currentStats.warnings.qualityNotes">
+              <div class="warning-title">质量问题：</div>
+              <div class="warning-content">{{ currentStats.warnings.qualityNotes }}</div>
+            </div>
+          </el-collapse-item>
+        </el-collapse>
       </div>
-      <div class="stat-card">
-        <div class="stat-icon">🌱</div>
-        <div class="stat-content">
-          <div class="stat-label">种植总数</div>
-          <div class="stat-value">{{ greenhouseStats.totalPlants }}</div>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon">📈</div>
-        <div class="stat-content">
-          <div class="stat-label">平均生长速度</div>
-          <div class="stat-value">{{ greenhouseStats.avgGrowth }}</div>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon">💪</div>
-        <div class="stat-content">
-          <div class="stat-label">健康率</div>
-          <div class="stat-value">{{ greenhouseStats.healthStatus }}</div>
-        </div>
-      </div>
-    </div>
+    </template>
+
 
     <!-- 生长趋势预测 -->
     <div class="analysis-card">
@@ -590,7 +1290,7 @@ onMounted(() => {
       <el-tabs>
         <el-tab-pane label="株高">
           <div class="chart-container">
-            <Line :data="filteredGrowthData.height" :options="chartOptions" />
+            <Line :data="growthTrendData.height" :options="chartOptions" />
           </div>
           <div class="analysis-info">
             <p><strong>预测结果：</strong>{{ analysisResults.growth.height.prediction }}</p>
@@ -600,7 +1300,7 @@ onMounted(() => {
         
         <el-tab-pane label="茎粗">
           <div class="chart-container">
-            <Line :data="filteredGrowthData.stemDiameter" :options="chartOptions" />
+            <Line :data="growthTrendData.stemDiameter" :options="chartOptions" />
           </div>
           <div class="analysis-info">
             <p><strong>预测结果：</strong>{{ analysisResults.growth.stemDiameter.prediction }}</p>
@@ -610,7 +1310,7 @@ onMounted(() => {
         
         <el-tab-pane label="叶面积">
           <div class="chart-container">
-            <Line :data="filteredGrowthData.leafArea" :options="chartOptions" />
+            <Line :data="growthTrendData.leafArea" :options="chartOptions" />
           </div>
           <div class="analysis-info">
             <p><strong>预测结果：</strong>{{ analysisResults.growth.leafArea.prediction }}</p>
@@ -620,21 +1320,11 @@ onMounted(() => {
         
         <el-tab-pane label="叶片数">
           <div class="chart-container">
-            <Line :data="filteredGrowthData.leafCount" :options="chartOptions" />
+            <Line :data="growthTrendData.leafCount" :options="chartOptions" />
           </div>
           <div class="analysis-info">
             <p><strong>预测结果：</strong>{{ analysisResults.growth.leafCount.prediction }}</p>
             <p><strong>趋势分析：</strong>{{ analysisResults.growth.leafCount.trend }}</p>
-          </div>
-        </el-tab-pane>
-        
-        <el-tab-pane label="开花密度">
-          <div class="chart-container">
-            <Line :data="filteredGrowthData.flowerDensity" :options="chartOptions" />
-          </div>
-          <div class="analysis-info">
-            <p><strong>预测结果：</strong>{{ analysisResults.growth.flowerDensity.prediction }}</p>
-            <p><strong>趋势分析：</strong>{{ analysisResults.growth.flowerDensity.trend }}</p>
           </div>
         </el-tab-pane>
       </el-tabs>
@@ -648,12 +1338,44 @@ onMounted(() => {
     <div class="analysis-card">
       <h3>产量预测</h3>
       <div class="chart-container">
-        <Line :data="filteredYieldData" :options="chartOptions" />
+        <Line 
+          v-if="yieldData.labels.length > 0"
+          :data="yieldData" 
+          :options="chartOptions" 
+        />
+        <div v-else class="no-data">暂无数据</div>
       </div>
-      <div class="analysis-info">
-        <p><strong>预测结果：</strong>{{ analysisResults.yield.prediction }}</p>
-        <p><strong>趋势分析：</strong>{{ analysisResults.yield.trend }}</p>
-        <p><strong>建议措施：</strong>{{ analysisResults.yield.suggestion }}</p>
+      <div class="analysis-results">
+        <div class="result-item">
+          <span class="label">当前状态：</span>
+          <el-tag :type="getStatusType(yieldAnalysis.currentStatus)">
+            {{ yieldAnalysis.currentStatus }}
+          </el-tag>
+        </div>
+        <div class="result-item">
+          <span class="label">已采收产量：</span>
+          <span class="value">{{ yieldAnalysis.totalYield.toFixed(1) }}kg</span>
+        </div>
+        <div class="result-item">
+          <span class="label">预计总产量：</span>
+          <span class="value">{{ yieldAnalysis.predictedTotal.toFixed(1) }}kg</span>
+        </div>
+        <div class="result-item">
+          <span class="label">完成进度：</span>
+          <el-progress 
+            :percentage="yieldAnalysis.completionRate" 
+            :status="getProgressStatus(yieldAnalysis.completionRate)"
+          />
+        </div>
+        <div class="result-item">
+          <span class="label">平均质量：</span>
+          <el-tag :type="getQualityType(yieldAnalysis.averageQuality)">
+            {{ yieldAnalysis.averageQuality }}
+          </el-tag>
+        </div>
+        <div class="result-item suggestion">
+          <p><strong>建议措施：</strong>{{ yieldAnalysis.suggestion }}</p>
+        </div>
       </div>
     </div>
 
@@ -661,16 +1383,26 @@ onMounted(() => {
     <div class="analysis-card">
       <h3>环境预测与告警</h3>
       <div class="chart-container">
-        <Line :data="filteredEnvironmentData.temperature" :options="chartOptions" />
+        <Line 
+          v-if="environmentData.temperature.labels.length > 0"
+          :data="environmentData.temperature" 
+          :options="temperatureChartOptions"
+        />
+        <div v-else class="no-data">暂无温度数据</div>
       </div>
       <div class="chart-container">
-        <Line :data="filteredEnvironmentData.humidity" :options="chartOptions" />
+        <Line 
+          v-if="environmentData.humidity.labels.length > 0"
+          :data="environmentData.humidity" 
+          :options="humidityChartOptions"
+        />
+        <div v-else class="no-data">暂无湿度数据</div>
       </div>
       <div class="warnings">
         <h4>预警信息</h4>
         <el-timeline>
           <el-timeline-item
-            v-for="warning in warnings"
+            v-for="warning in environmentWarnings"
             :key="warning.time"
             :type="warning.level"
             :timestamp="warning.time"
@@ -683,7 +1415,7 @@ onMounted(() => {
     </div>
 
     <!-- 添加土壤养分监控与分析 -->
-    <div class="analysis-card">
+    <!-- <div class="analysis-card">
       <h3>土壤养分监控与分析</h3>
       <el-tabs>
         <el-tab-pane label="氮素">
@@ -730,7 +1462,7 @@ onMounted(() => {
       <div class="analysis-info">
         <p><strong>综合建议：</strong>{{ analysisResults.soil.suggestion }}</p>
       </div>
-    </div>
+    </div> -->
   </div>
 </template>
 
@@ -930,4 +1662,157 @@ onMounted(() => {
     padding-bottom: 10px;
   }
 }
-</style> 
+
+/* 添加新的样式 */
+.info-section {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+}
+
+.info-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.info-card {
+  display: flex;
+  align-items: center;
+  padding: 16px;
+  background: var(--el-color-primary-light-9);
+  border-radius: 8px;
+}
+
+.info-icon {
+  font-size: 24px;
+  margin-right: 12px;
+}
+
+.info-content {
+  flex: 1;
+}
+
+.info-label {
+  font-size: 14px;
+  color: var(--el-text-color-secondary);
+  margin-bottom: 4px;
+}
+
+.info-value {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--el-color-primary);
+}
+
+.info-sub {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  margin-top: 2px;
+}
+
+.management-info {
+  margin-top: 20px;
+}
+
+.warning-info {
+  margin-bottom: 16px;
+}
+
+.warning-title {
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--el-color-danger);
+}
+
+.warning-content {
+  color: var(--el-text-color-regular);
+  line-height: 1.5;
+}
+
+/* 深色模式适配 */
+@media (prefers-color-scheme: dark) {
+  .info-section {
+    background: var(--el-bg-color);
+  }
+
+  .info-card {
+    background: var(--el-color-primary-light-3);
+  }
+}
+
+.analysis-results {
+  margin-top: 20px;
+  padding: 16px;
+  background: var(--el-fill-color-light);
+  border-radius: 4px;
+}
+
+.result-item {
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+}
+
+.result-item .label {
+  width: 100px;
+  color: var(--el-text-color-secondary);
+}
+
+.result-item .value {
+  font-weight: 600;
+  color: var(--el-color-primary);
+}
+
+.suggestion {
+  margin-top: 16px;
+  display: block;
+}
+
+.suggestion strong {
+  color: var(--el-text-color-regular);
+  margin-right: 8px;
+}
+
+.no-data {
+  height: 300px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--el-text-color-secondary);
+  font-size: 14px;
+}
+</style>
+
+<script lang="ts">
+// 工具函数
+const getStatusType = (status: string) => {
+  const typeMap: Record<string, string> = {
+    '未开始': 'info',
+    '进行中': 'warning',
+    '已完成': 'success',
+    '未知': 'info'
+  };
+  return typeMap[status] || 'info';
+};
+
+const getQualityType = (quality: string) => {
+  const typeMap: Record<string, string> = {
+    '优秀': 'success',
+    '良好': 'warning',
+    '一般': 'info',
+    '较差': 'danger',
+    '未知': 'info'
+  };
+  return typeMap[quality] || 'info';
+};
+
+const getProgressStatus = (rate: number) => {
+  if (rate >= 100) return 'success';
+  if (rate >= 80) return 'warning';
+  return '';
+};
+</script> 

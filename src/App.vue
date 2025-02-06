@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { RouterLink, RouterView } from 'vue-router'
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 
 const route = useRoute()
 const showMobileMenu = ref(false)
+const isMobile = ref(false)
+const isMenuOpen = ref(false)
 
 const navItems = ref([
   { path: '/', name: '首页', icon: '🏠' },
@@ -164,9 +166,34 @@ const getBreadcrumbs = computed(() => {
   
   return breadcrumbs
 })
+
+const toggleMenu = () => {
+  console.log('Toggle menu clicked, current state:', isMenuOpen.value)
+  isMenuOpen.value = !isMenuOpen.value
+  console.log('New state:', isMenuOpen.value)
+}
+
+const checkScreenSize = () => {
+  isMobile.value = window.innerWidth <= 768
+  if (!isMobile.value) {
+    isMenuOpen.value = false
+  }
+}
+
+onMounted(() => {
+  checkScreenSize()
+  window.addEventListener('resize', checkScreenSize)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', checkScreenSize)
+})
 </script>
 
 <template>
+  <!-- 添加网站图标 -->
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="icon" type="image/png" href="/favicon.png">
   <header :class="{ 'mobile-menu-open': showMobileMenu }">
     <div class="header-container">
       <div class="logo">
@@ -210,25 +237,36 @@ const getBreadcrumbs = computed(() => {
       </div>
 
       <!-- 导航菜单 -->
-      <nav :class="{ 'show-mobile-menu': showMobileMenu }">
-        <div class="nav-container">
+      <nav class="nav-menu">
+        <!-- 汉堡菜单按钮 -->
+        <button 
+          class="hamburger-btn" 
+          :class="{ 'is-open': isMenuOpen }"
+          @click="toggleMenu" 
+          v-show="isMobile"
+          aria-label="菜单"
+        >
+          <div class="hamburger-lines">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+        </button>
+        
+        <!-- 导航菜单列表 -->
+        <div class="nav-links" :class="{ 'is-open': isMenuOpen }">
           <RouterLink 
             v-for="item in navItems" 
             :key="item.path"
             :to="item.path"
             class="nav-link"
-            @click="showMobileMenu = false"
+            @click="isMenuOpen = false"
           >
             <span class="icon">{{ item.icon }}</span>
             <span class="text">{{ item.name }}</span>
           </RouterLink>
         </div>
       </nav>
-
-      <!-- 移动端菜单按钮 -->
-      <button class="mobile-menu-btn" @click="toggleMobileMenu">
-        <span class="menu-icon"></span>
-      </button>
     </div>
   </header>
 
@@ -572,85 +610,139 @@ h1::after {
   }
 }
 
-/* 移动端菜单按钮 */
-.mobile-menu-btn {
+/* 导航菜单基础样式 */
+.nav-menu {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin: 0 20px;
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+
+.hamburger-btn {
   display: none;
   background: none;
   border: none;
-  padding: 10px;
   cursor: pointer;
+  padding: 15px;
+  z-index: 1000;
+  margin-left: auto;
+  transition: transform 0.3s ease;
 }
 
-.menu-icon {
-  display: block;
-  width: 25px;
-  height: 2px;
-  background-color: #2c3e50;
+.hamburger-btn:hover {
+  transform: scale(1.1);
+}
+
+.hamburger-lines {
+  width: 24px;
+  height: 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
   position: relative;
-  transition: all 0.3s ease;
 }
 
-.menu-icon::before,
-.menu-icon::after {
-  content: '';
-  position: absolute;
-  width: 25px;
+.hamburger-lines span {
+  display: block;
   height: 2px;
-  background-color: #2c3e50;
+  width: 100%;
+  background: #333;
+  border-radius: 4px;
   transition: all 0.3s ease;
 }
 
-.menu-icon::before {
-  transform: translateY(-8px);
+/* 汉堡菜单动画效果 */
+.hamburger-btn.is-open .hamburger-lines span:nth-child(1) {
+  transform: translateY(8px) rotate(45deg);
 }
 
-.menu-icon::after {
-  transform: translateY(8px);
+.hamburger-btn.is-open .hamburger-lines span:nth-child(2) {
+  opacity: 0;
+}
+
+.hamburger-btn.is-open .hamburger-lines span:nth-child(3) {
+  transform: translateY(-8px) rotate(-45deg);
 }
 
 /* 移动端样式 */
-@media (max-width: 1024px) {
-  .header-container {
-    padding: 0 15px;
+@media screen and (max-width: 768px) {
+  .nav-menu {
+    margin: 0;
+    padding-right: 10px;
   }
 
-  nav {
+  .hamburger-btn {
+    display: block;
+  }
+
+  .nav-links {
     position: fixed;
     top: 80px;
     left: 0;
     right: 0;
-    margin: 0;
-    background-color: white;
-    padding: 15px 0;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    transform: translateY(-100%);
+    width: 100%;
+    display: none;
+    flex-direction: column;
+    background: white;
+    padding: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    z-index: 999;
     opacity: 0;
-    visibility: hidden;
+    transform: translateY(-10px);
     transition: all 0.3s ease;
-    overflow-x: auto;
   }
 
-  .nav-container {
-    padding: 0 15px;
+  .nav-links.is-open {
     display: flex;
-    flex-wrap: nowrap;  /* 防止换行 */
-    justify-content: flex-start;
-    gap: 8px;
-  }
-
-  .show-mobile-menu {
-    transform: translateY(0);
     opacity: 1;
-    visibility: visible;
+    transform: translateY(0);
   }
 
   .nav-link {
-    padding: 10px 15px;
-    flex-shrink: 0;  /* 防止链接被压缩 */
+    width: 100%;
+    padding: 12px 16px;
+    margin: 4px 0;
+    border-radius: 8px;
+    transition: all 0.2s ease;
   }
 
-  .mobile-menu-btn {
-    margin-left: 15px;
+  .nav-link:hover {
+    background-color: #f5f5f5;
+    transform: translateX(5px);
+  }
+
+  .nav-link .icon {
+    margin-right: 12px;
+    font-size: 1.2em;
+  }
+
+  .nav-link .text {
+    font-weight: 500;
+  }
+}
+
+/* 深色模式适配 */
+@media (prefers-color-scheme: dark) {
+  .hamburger-lines span {
+    background: #fff;
+  }
+
+  .nav-links {
+    background: #1a1a1a;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  }
+
+  .nav-link:hover {
+    background-color: #2d2d2d;
   }
 }
 
