@@ -116,8 +116,8 @@ const router = createRouter({
           component: () => import('../views/big-data/manual/ManualDataView.vue')
         },
         {
-          path: 'analysis/pest-disease',
-          name: 'pestDiseaseAnalysis',
+          path: 'analysis/intelligent-analytics',
+          name: 'intelligentAnalytics',
           component: () => import('../views/big-data/analysis/IntelligentAnalyticsView.vue')
         }
       ]

@@ -26,7 +26,7 @@ const router = useRouter()
           </div>
 
           <div class="module-card"
-               @click="router.push('/big-data/analysis/pest-disease')"
+               @click="router.push('/big-data/analysis/intelligent-analytics')"
                :class="{ clickable: true }">
             <div class="module-icon">🔍</div>
             <h4>智能分析</h4>
